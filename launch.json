@@ -1,0 +1,20 @@
+{
+  "kind": "custom_token",
+  "token": {
+    "contract": "DriftPebble",
+    "name": "Drift Pebble",
+    "symbol": "DPBL",
+    "decimals": 18,
+    "constructorArgs": [],
+    "totalSupply": "1000000000000000000000000000"
+  },
+  "contracts": [],
+  "pool": {
+    "pairedCurrency": "0x5f7bb59365ce557c26dbcaa4ee9d39a4b95b7127",
+    "fee": 12500,
+    "tickSpacing": 60,
+    "initialPrice": "79228162514264337593543950336"
+  },
+  "economics": {"poolBps":9000,"initialMarketCapWei":"2500000000000000000000"},
+  "notes": "DriftPebble is a fixed-supply ERC-20 named Drift Pebble (DPBL) with 18 decimals. Its constructor takes no arguments and mints all 1,000,000,000 tokens once to msg.sender, the factory at launch. Transfers are fee-free, and there are no subsequent mint, burn or administrative entry points. No application contracts are deployed. The pool pairs with IMD; initialPrice records provenance, while the opening price is derived from economics.initialMarketCapWei and totalSupply."
+}
