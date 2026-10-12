@@ -21,6 +21,7 @@ contract RejectingReceiver {
     }
 }
 
+/// forge-config: default.fuzz.runs = 1000
 contract DriftPebbleTest is Test {
     uint256 private constant SUPPLY = 1_000_000_000_000_000_000_000_000_000;
 
@@ -304,35 +305,39 @@ contract DriftPebbleTest is Test {
     function test_noMintBurnOrAdministrativeEntryPoints() public {
         vm.prank(deployer);
         token.transfer(alice, 100);
-        string[17] memory signatures = [
-            "mint(address,uint256)",
-            "mint(uint256)",
-            "mint()",
-            "issue(uint256)",
-            "initialize(address)",
-            "setMinter(address)",
-            "burn(uint256)",
-            "burnFrom(address,uint256)",
-            "pause()",
-            "blacklist(address)",
-            "freeze(address)",
-            "lock(address)",
-            "seize(address)",
-            "transferOwnership(address)",
-            "upgradeTo(address)",
-            "setTransfersEnabled(bool)",
-            "setBlacklist(address,bool)"
+        // Use valid ABI arguments: a malformed bool or an unaffordable burn amount
+        // would revert even if a forbidden administrative entry point existed.
+        bytes[17] memory calls = [
+            abi.encodeWithSignature("mint(address,uint256)", alice, 1),
+            abi.encodeWithSignature("mint(uint256)", 1),
+            abi.encodeWithSignature("mint()"),
+            abi.encodeWithSignature("issue(uint256)", 1),
+            abi.encodeWithSignature("initialize(address)", alice),
+            abi.encodeWithSignature("setMinter(address)", alice),
+            abi.encodeWithSignature("burn(uint256)", 1),
+            abi.encodeWithSignature("burnFrom(address,uint256)", alice, 1),
+            abi.encodeWithSignature("pause()"),
+            abi.encodeWithSignature("blacklist(address)", alice),
+            abi.encodeWithSignature("freeze(address)", alice),
+            abi.encodeWithSignature("lock(address)", alice),
+            abi.encodeWithSignature("seize(address)", alice),
+            abi.encodeWithSignature("transferOwnership(address)", alice),
+            abi.encodeWithSignature("upgradeTo(address)", alice),
+            abi.encodeWithSignature("setTransfersEnabled(bool)", false),
+            abi.encodeWithSignature("setBlacklist(address,bool)", alice, true)
         ];
-        for (uint256 i; i < signatures.length; ++i) {
-            bytes memory data = abi.encodeWithSignature(signatures[i], alice, 1);
+        for (uint256 i; i < calls.length; ++i) {
+            bytes memory data = calls[i];
             vm.prank(deployer);
             (bool deployerSucceeded,) = address(token).call(data);
-            assertFalse(deployerSucceeded, signatures[i]);
+            assertFalse(deployerSucceeded, "deployer reached an administrative entry point");
             vm.prank(bob);
             (bool strangerSucceeded,) = address(token).call(data);
-            assertFalse(strangerSucceeded, signatures[i]);
+            assertFalse(strangerSucceeded, "stranger reached an administrative entry point");
             assertEq(token.totalSupply(), SUPPLY);
+            assertEq(token.balanceOf(deployer), SUPPLY - 100);
             assertEq(token.balanceOf(alice), 100);
+            assertEq(token.balanceOf(bob), 0);
         }
         vm.prank(alice);
         assertTrue(token.transfer(bob, 100));
@@ -383,12 +388,16 @@ contract DriftPebbleTest is Test {
     }
 
     function testFuzz_transferConservesSupply(address recipient, uint256 amount) public {
-        vm.assume(recipient != address(0) && recipient != deployer);
+        recipient = address(uint160(bound(uint256(uint160(recipient)), 1, type(uint160).max)));
         amount = bound(amount, 0, SUPPLY);
         vm.prank(deployer);
         assertTrue(token.transfer(recipient, amount));
-        assertEq(token.balanceOf(recipient), amount);
-        assertEq(token.balanceOf(deployer), SUPPLY - amount);
+        if (recipient == deployer) {
+            assertEq(token.balanceOf(deployer), SUPPLY);
+        } else {
+            assertEq(token.balanceOf(recipient), amount);
+            assertEq(token.balanceOf(deployer), SUPPLY - amount);
+        }
         assertEq(token.totalSupply(), SUPPLY);
     }
 
